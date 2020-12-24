@@ -1,0 +1,39 @@
+{
+  "name": "otk",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "bin": {
+    "hello": "./bin/server.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "babel ./ -s -d dist",
+    "dev": "nodemon"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
+    "express-graphql": "^0.12.0",
+    "express-session": "^1.17.1",
+    "graphql": "^15.4.0",
+    "graphql-fields-list": "^2.2.1",
+    "graphql-type-decimal": "^1.0.0",
+    "graphql-type-json": "^0.3.2",
+    "lodash": "^4.17.20",
+    "moment": "^2.29.1",
+    "nano": "^9.0.1",
+    "node-fetch": "^2.6.1",
+    "passport": "^0.4.1",
+    "pg": "^8.5.1",
+    "session-file-store": "^1.5.0",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "babel": "^6.23.0",
+    "babel-cli": "^6.26.0",
+    "nodemon": "^2.0.6"
+  }
+}
