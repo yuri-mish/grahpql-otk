@@ -7,9 +7,6 @@ const cors = require('cors');
 
 const { errorType } = require('./constants')
 
-const session = require('express-session');
-//const passport = require('passport');
-//const User = require('./src/Users');
 const Users = require("./src/data/users");
 const getErrorCode = errorName => {
   return errorType[errorName] 
@@ -33,9 +30,10 @@ const loggingMiddleware = (req, res, next) => {
     return list;
 }
 var token = parseCookies(req).token||'';
-  console.log(token)
+  console.log('token', token)
   req.currUser = Users.find((u)=>{return u.token===token})
-  console.log('ip:', req.currUser);
+  if (req.currUser)
+    res.setHeader('Set-Cookie',[`token=${req.currUser.token};  Path=/; Max-age= 3600;SameSite=false;`]);  
   next();
 }
 const app = express();
@@ -47,24 +45,11 @@ app.use ( cors({
   'origin': ['http://localhost:3000','http://localhost:4000'],
 
 }) )
-// app.use(session({ 
 
-// //  genid: (req) => uuidv4(),
-//   //genid: (req) => "12345678",
-//   secret: SESSION_SECRECT,
-//   cookie: { maxAge: 60000,httpOnly:false },
-//   saveUninitialized: true,
-  
-//   resave:false
-
-//       }));
       
 app.use(loggingMiddleware);
       
-// app.get('/get-cookie', (req, res) => {
-//         console.log('Cookie: ', req.cookies)
-//         res.send('Get Cookie')
-//       })
+
 
  app.get('/set-cookie', (req, res) => {
          res.cookie('token', '12345ABCDE')
@@ -81,8 +66,8 @@ app.use('/', graphqlHTTP((req,res)=>{
   
    customFormatErrorFn: (err) => {
      const error = getErrorCode(err.message)
+     console.log('=Err:',err,error,err.message)
      if (!error) return ({ message: 'Якась помилка', statusCode: 303 })
-     console.log('=Err:',error,err.message)
      return ({ message: error.message, statusCode: error.statusCode })
    }
 })}));

@@ -15,7 +15,7 @@ exports.errorType = {
     statusCode: 500
   },
   AUTH_ERROR: {
-    message: 'Помилка входу',
-    statusCode: 403
+    message: 'Необхідна авторизація',
+    statusCode: 401
   }
 }
