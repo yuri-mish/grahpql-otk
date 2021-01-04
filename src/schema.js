@@ -240,6 +240,16 @@ const NomType = new GraphQLObjectType({
     };
   },
 });
+const PriceType = new GraphQLObjectType({
+  name: "price",
+  description: "This represent price",
+  fields: () => {
+    return {
+      nom: { type: GraphQLString },
+      price: {type: GraphQLFloat },
+      }
+    }
+  });
 
 const OrganizationType = new GraphQLObjectType({
   name: "Organisation",
@@ -528,6 +538,31 @@ const BlogQueryRootType = new GraphQLObjectType({
         });
       },
     },
+    prices: {
+      name: "prices",
+      type: new GraphQLList(PriceType),
+      args: {
+        date: {
+          type: GraphQLString,
+        },
+      },
+      resolve: async function (par, args, cont, info) {
+        console.log('metthod prices:',args);
+        user = cont.currUser
+            dateFilt = ` and d.date <= '${args.date}'`
+        qq = `select d.date, pr->>'nom' nom, pr->>'price' price from doc d 
+        join  (select max(d.date) date from doc d,jsonb_array_elements(d.jsb->'goods') pr  
+                where d.class_name = 'doc.nom_prices_setup' ${dateFilt} and pr.value->>'price_type'='${user.price_type}' 
+                group by ( pr.value->>'price_type')) maxd 
+          on d.date = maxd.date and d.class_name = 'doc.nom_prices_setup' 
+        join jsonb_array_elements(d.jsb->'goods') pr 
+          on pr.value->>'price_type' ='${user.price_type}'`
+        const dbf = require("./db");
+        console.log(qq);
+        res = await dbf.query(qq, []);
+        return res.rows;
+      },
+    },
     branch: {
       name: "branch",
       type: GraphQLJSONObject,
@@ -639,7 +674,7 @@ const BlogQueryRootType = new GraphQLObjectType({
               return { ok: false };
             }
           })
-          .then((data) => {
+          .then(async (data) => {
             if (!data.ok) return data;
             console.log("=login respons=:" + JSON.stringify(data));
             var user = Users.find((obj) => {
@@ -664,6 +699,25 @@ const BlogQueryRootType = new GraphQLObjectType({
                 Math.random().toString(36).substring(2, 15) +
                 Math.random().toString(36).substring(2, 15);
               data.token = token;
+
+              var qq = `SELECT d.jsb jsb FROM cat d  where d.ref='${branch}' and d.class_name='cat.branches'`
+              console.log('branch:',branch)
+              const dbf = require("./db");
+              
+              organizations = ''
+              price_type = ''
+              var resQ = await dbf.query(qq, []);
+                if (resQ.rowCount>0){
+                   br_row = resQ.rows[0].jsb
+                   organizations = br_row.organizations[0].acl_obj;
+                   console.log('organizations:',organizations)
+                   br_row.departments[0].acl_obj.extra_fields.forEach((extr)=>{
+                     if (extr.property_name === "ТипЦенНоменклатуры")
+                      price_type = extr.value
+                   }); 
+                   console.log('price_type:',price_type)
+   
+              }
               Users.push({
                 ref: ref,
                 name: data.name,
@@ -671,6 +725,9 @@ const BlogQueryRootType = new GraphQLObjectType({
                 branch: branch,
                 token: data.token,
                 validTo: moment().add(3, "hours"),
+                organizations:organizations,
+                price_type:price_type
+
               });
             } else {
               token = user.token;
@@ -681,6 +738,9 @@ const BlogQueryRootType = new GraphQLObjectType({
             return data;
           })
           .catch((error) => console.log("=Error=:" + error));
+          
+         
+
         if (res.ok) return { ok: res.ok, name: res.name, token: res.token };
         else return new Error("AUTH_ERROR");
       },

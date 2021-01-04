@@ -1,3 +1,5 @@
+const _ = require("lodash");
+
 const getRefObj = (obj) => {
   if (!obj._id) {
     return null;
@@ -46,7 +48,7 @@ const createQuery = (args, info, class_name, type, queryOptions = {}) => {
   });
 
   var filt = "";
-  if (args.filter)
+  if (args.filter && args.filter.length >0)
     args.filter.forEach((f_el) => {
       filt += ` and d.jsb->>'${f_el.field}' ilike '%${f_el.value}%' `;
     });
@@ -58,6 +60,7 @@ const createQuery = (args, info, class_name, type, queryOptions = {}) => {
       switch (_fld) {
         case "date":
           fld = `d.${_fld}`;
+              if(_.isEmpty(val)) val='0001-01-01';
           break;
         default:
           fld = `d.jsb->>'${_fld}'`;
@@ -180,7 +183,7 @@ const createQueryCat = (
     if (args.limit) limit = args.limit;
   }
 
-  if (args.filter)
+  if (args.filter && args.filter.length >0)
     args.filter.forEach((f_el) => {
       filt += ` and d.jsb->>'${f_el.field}' ilike '%${f_el.value}%' `;
     });
@@ -199,7 +202,7 @@ const createQueryCat = (
       strSel +
       " jsb, 0 orderU,d.jsb->>'name' jname FROM cat d " +
       strJoin +
-      " where d.jsb->>'class_name'= 'cat." +
+      " where not d.jsb?'_deleted' and d.jsb->>'class_name'= 'cat." +
       class_name +
       "' and d.ref = '" +
       createQueryOptions.lookup.trim() +
@@ -211,12 +214,12 @@ const createQueryCat = (
     strSel +
     " jsb, 1 orderU FROM cat d " +
     strJoin +
-    " WHERE d.jsb->>'class_name'= 'cat." +
+    " WHERE not d.jsb?'_deleted' and d.jsb->>'class_name'= 'cat." +
     class_name +
     "'" +
     filt;
   var qqTotalCount =
-    "SELECT count(ref) totalcount FROM cat d  WHERE d.jsb->>'class_name'= 'cat." +
+    "SELECT count(ref) totalcount FROM cat d  WHERE not d.jsb?'_deleted' and d.jsb->>'class_name'= 'cat." +
     class_name +
     "'" +
     filt;
@@ -294,7 +297,7 @@ const createQueryTabular = (
     strSel +
     " jsb FROM (select jsonb_array_elements(d.jsb->'" +
     tabular +
-    "') jsb from doc d where d.jsb->>'class_name'= 'doc." +
+    "') jsb from doc d where not d.jsb?'_deleted' and d.jsb->>'class_name'= 'doc." +
     class_name +
     "' and d.id = '" +
     par._id +

@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "chrome",
+            "type": "nodejs",
             "request": "launch",
             "name": "Launch Chrome against localhost",
             "url": "http://starsam.net:4000",
