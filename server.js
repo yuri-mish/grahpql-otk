@@ -8,6 +8,9 @@ const cors = require('cors');
 const { errorType } = require('./constants')
 
 const Users = require("./src/data/users");
+
+const {docSync,catSync} = require("./src/schFunk");
+
 const getErrorCode = errorName => {
   return errorType[errorName] 
 }
@@ -71,6 +74,9 @@ app.use('/', graphqlHTTP((req,res)=>{
      return ({ message: error.message, statusCode: error.statusCode })
    }
 })}));
+
+docSync();
+catSync();
 
 app.listen(port);   
 console.log('GraphQL API server running at localhost:'+ port);

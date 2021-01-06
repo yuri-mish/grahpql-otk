@@ -25,119 +25,11 @@ const {
   getRefObj,
   createQuery,
   createQueryTabular,
-  createQueryCat,
+  createQueryCat,docSync,catSync
 } = require("./schFunk");
 //const { errorName } = require("../constants");
 const { Cookie } = require("express-session");
 
-const docSync = async () => {
-  const dbf = require("./db");
-  const couch = dbf.couch.use("otk_2_doc");
-
-  const res = await dbf.querySync(
-    "select doc_ver from couchconfig where id=1",
-    []
-  );
-  var seq;
-  const doc_ver = res.rows[0].doc_ver;
-  console.log("doc sync from seq:" + doc_ver);
-  couch.changesReader
-    .start({ since: doc_ver, includeDocs: true, wait: true })
-    .on("batch", async (b) => {
-      b.map(async (rec) => {
-        if (!rec.doc || !rec.doc._id || !rec.doc.class_name ) return;
-        var ref = rec.doc._id.split("|")[1];
-        var dateF = new Date("0001-01-01T00:00:00");
-        try {
-          dateF = new Date(rec.doc.date); // console.log(rec.doc)
-        } catch (e) {
-          console.log(
-            "Ошибка конвертации даты в документе:" + JSON.stringify(rec.doc)
-          );
-        }
-
-        await dbf.querySync(
-          "INSERT INTO doc" +
-            " (id,class_name,ref,jsb,date,branch) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (id) do " +
-            "UPDATE SET class_name = EXCLUDED.class_name,ref=EXCLUDED.ref,jsb=EXCLUDED.jsb,date=EXCLUDED.date,branch=EXCLUDED.branch",
-          [
-            rec.doc._id,
-            rec.doc.class_name,
-            ref,
-            rec.doc,
-            dateF,
-            rec.doc.department,
-          ],
-          (err, res) => {
-            if (err) {
-              console.log(err);
-            }
-            seq = rec.seq;
-          }
-        );
-      });
-      const f_name = "doc_ver";
-      if (seq)
-        await dbf.querySync(
-          "UPDATE couchconfig SET doc_ver ='" + seq + "' where id=1",
-          [],
-          (err, res) => {
-            if (err) {
-              console.log(err);
-            }
-          }
-        );
-      couch.changesReader.resume();
-    })
-    .on("error", (e) => {
-      console.log("Error::", e);
-    });
-};
-
-const catSync = async () => {
-  const dbf = require("./db");
-  const couch = dbf.couch.use("otk_2_ram");
-  const res = await dbf.querySync(
-    "select cat_ver from couchconfig where id=1",
-    []
-  );
-  var seq;
-  const rev = res.rows[0].cat_ver;
-  console.log("cat from seq:" + rev);
-  couch.changesReader
-    .start({ since: rev, includeDocs: true })
-    .on("batch", (b) => {
-      b.map((rec) => {
-        if (!rec.doc._id || !rec.doc.class_name) return;
-        var ref = rec.doc._id.split("|")[1];
-        dbf.querySync(
-          "INSERT INTO cat" +
-            " (id,class_name,ref,jsb) VALUES($1,$2,$3,$4) ON CONFLICT (id) do " +
-            "UPDATE SET class_name = EXCLUDED.class_name,ref=EXCLUDED.ref,jsb=EXCLUDED.jsb",
-          [rec.doc._id, rec.doc.class_name, ref, rec.doc],
-          (err, res) => {
-            if (err) {
-              console.log(err);
-            }
-            seq = rec.seq;
-          }
-        );
-      });
-      if (seq)
-        dbf.querySync(
-          "UPDATE couchconfig SET cat_ver='" + seq + "' where id=1",
-          [],
-          (err, res) => {
-            if (err) {
-              console.log(err);
-            }
-          }
-        );
-    })
-    .on("error", (e) => {
-      console.log("Error::", e);
-    });
-};
 
 const PartnerType = new GraphQLObjectType({
   name: "Partner",
@@ -237,6 +129,9 @@ const NomType = new GraphQLObjectType({
       },
       name: { type: GraphQLString },
       name_full: { type: GraphQLString },
+      vat_rate: { type: GraphQLString },
+      totalcount:{ type: GraphQLInt },
+
     };
   },
 });
@@ -247,6 +142,8 @@ const PriceType = new GraphQLObjectType({
     return {
       nom: { type: GraphQLString },
       price: {type: GraphQLFloat },
+      currency: { type: GraphQLString },
+      vat_included: {type: GraphQLString },
       }
     }
   });
@@ -315,6 +212,7 @@ const BuyersOrderType = new GraphQLObjectType({
     ClientPerson: { type: GraphQLString },
     ClientPersonPhone: { type: GraphQLString },
     responsible:{type:UserType},
+    vat_included:{type: GraphQLString},
     note: { type: GraphQLString },
 
     totalcount:{ type: GraphQLInt },
@@ -477,6 +375,10 @@ const BlogQueryRootType = new GraphQLObjectType({
         filter: {
           type: new GraphQLList(filtType),
         },
+        jfilt: {
+          type: new GraphQLList(GraphQLJSON),
+        },
+
         totalCount: { type: GraphQLInt },
         js: { type: GraphQLJSON },
       },
@@ -516,26 +418,39 @@ const BlogQueryRootType = new GraphQLObjectType({
         lookup: { type: GraphQLString },
         nameContaine: { type: GraphQLString },
         name: { type: GraphQLString },
-        edrpou: { type: GraphQLString },
         filter: {
           type: new GraphQLList(filtType),
         },
         skip: { type: GraphQLInt },
+        jfilt: {
+          type: new GraphQLList(GraphQLJSON),
+        },
         js: { type: GraphQLJSON },
+        totalCount: { type: GraphQLInt },
+
       },
       resolve: async function (par, args, cont, info) {
         console.log(args);
         var qq = createQueryCat(args, info, "nom", NomType, {
           lookup: args.lookup,
           nameContaine: args.nameContaine,
-          limit: 50,
+          limit: args.limit?args.limit:undefined,
+          totalCount: args.totalCount?args.totalCount:undefined,
+
         });
         const dbf = require("./db");
         console.log(qq);
         res = await dbf.query(qq, []);
-        return res.rows.map((e) => {
-          return e.jsb;
-        });
+        
+        if (!args.totalCount){
+          return res.rows.map((e) => {
+              return e.jsb;
+          });
+        }   
+        return res.rows
+        // return res.rows.map((e) => {
+        //   return e.jsb;
+        // });
       },
     },
     prices: {
@@ -547,16 +462,24 @@ const BlogQueryRootType = new GraphQLObjectType({
         },
       },
       resolve: async function (par, args, cont, info) {
-        console.log('metthod prices:',args);
+        console.log('method prices:',args);
         user = cont.currUser
             dateFilt = ` and d.date <= '${args.date}'`
-        qq = `select d.date, pr->>'nom' nom, pr->>'price' price from doc d 
-        join  (select max(d.date) date from doc d,jsonb_array_elements(d.jsb->'goods') pr  
-                where d.class_name = 'doc.nom_prices_setup' ${dateFilt} and pr.value->>'price_type'='${user.price_type}' 
-                group by ( pr.value->>'price_type')) maxd 
-          on d.date = maxd.date and d.class_name = 'doc.nom_prices_setup' 
-        join jsonb_array_elements(d.jsb->'goods') pr 
-          on pr.value->>'price_type' ='${user.price_type}'`
+
+        qq=`with datenom AS(
+          select distinct max(d.date) maxdate, pr.value->'nom' nom     from doc d,jsonb_array_elements(d.jsb->'goods') pr  
+                          where d.class_name = 'doc.nom_prices_setup' ${dateFilt} and pr.value->>'price_type' = '${user.price_type}'
+                          group by ( pr.value->'nom'))
+          select datenom.maxdate date, datenom.nom nom, prc.price price, curr.currency currency ,curr.vat_included vat_included  from datenom 
+            left join 	(select d.date date, pr->'price' price, pr.value->'nom' nom 
+                    from doc d,jsonb_array_elements(d.jsb->'goods') pr 
+                    where d.class_name = 'doc.nom_prices_setup' ${dateFilt} and pr.value->>'price_type' = '${user.price_type}' ) prc
+            on datenom.maxdate = prc.date and datenom.nom = prc.nom
+            left join (select c.jsb->>'price_currency' currency, c.jsb->>'vat_price_included' vat_included  from cat c 
+                      where c.class_name='cat.nom_prices_types' and c.ref='${user.price_type}' ) curr              
+            on true  `
+            
+            
         const dbf = require("./db");
         console.log(qq);
         res = await dbf.query(qq, []);
@@ -716,8 +639,9 @@ const BlogQueryRootType = new GraphQLObjectType({
                       price_type = extr.value
                    }); 
                    console.log('price_type:',price_type)
-   
               }
+              
+
               Users.push({
                 ref: ref,
                 name: data.name,
@@ -763,19 +687,44 @@ const BlogMutationRootType = new GraphQLObjectType({
         //console.log("Source: ", source, "\n Args: ", args);
         //console.log("currUser:", context.currUser);
         if (!context.currUser) return new Error("AUTH_ERROR");
-
-        var qq = `SELECT d.jsb jsb FROM doc d  where d.id='${args.input._id}'`
+        const class_name = 'doc.buyers_order'
+        var qq = `SELECT d.jsb jsb FROM doc d  where d.id=$1 and d.class_name=$2`
         //console.log('Query:',qq)
         const dbf = require("./db");
-        var resQ = await dbf.query(qq, []);
+        var resQ = await dbf.query(qq, [args.input._id,class_name]);
+        var orig_doc = resQ.rows.length>0?resQ.rows[0].jsb:{
+              department:context.currUser.branch,
+              organization:context.currUser.organizations,
+            }
         //+++
         //console.log('ResQ:',resQ )
-        var resDoc = _.merge(resQ.rows[0].jsb,args.input)
+        var resDoc = _.merge(orig_doc,args.input)
         //console.log ('resDoc:', JSON.stringify(resDoc))
         
         const couch = dbf.couch.use("otk_2_doc");
-        dbf.query(`UPDATE doc SET jsb='${JSON.stringify(resDoc)}', date=${new Date(resDoc.date)} WHERE id=${resDoc._id} `, []);
-        await couch.insert(resDoc).then((body) => {}  )
+        if (resQ.rows.length>0) {
+          dbf.query(`UPDATE doc SET jsb=$1, date=$2,class_name=$3,branch=$4 WHERE id=$5 and class_name=$3`, 
+          [JSON.stringify(resDoc),
+          new Date(resDoc.date),
+          class_name,
+          context.currUser.branch,
+          resDoc._id
+          ]);
+        }
+        else 
+        {
+          dbf.query(`INSERT INTO doc (id,jsb,date,class_name,branch) VALUES($1,$2,$3,$4,$5)`, 
+          [ args.input._id,
+            JSON.stringify(resDoc),
+          new Date(resDoc.date),
+          class_name,
+          context.currUser.branch
+          ]);
+        } 
+         
+        await couch.insert(resDoc).then((body) => {
+          // console.log('=couch response',body)
+        }  )
       
         return {_id:"ok"}
       },
