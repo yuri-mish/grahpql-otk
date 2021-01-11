@@ -55,6 +55,20 @@ const PartnerType = new GraphQLObjectType({
       name: { type: GraphQLString },
       edrpou: { type: GraphQLString },
       totalcount:{ type: GraphQLInt },
+
+//      name: { type: GraphQLString },
+//      edrpou: { type: GraphQLString },
+      id: { type: GraphQLString },
+      parent:{ type: GraphQLString },
+      is_buyer:{type: GraphQLInt},
+      is_supplier:{type: GraphQLInt},
+      legal_address:{ type: GraphQLString },
+      partner_details:{ type: GraphQLString },
+      individual_legal:{ type: GraphQLString },
+      inn:{ type: GraphQLString },
+      note:{type: GraphQLString},
+      name_full:{type: GraphQLString},
+
     };
   },
 });
@@ -369,9 +383,8 @@ const BlogQueryRootType = new GraphQLObjectType({
           type: GraphQLInt,
         },
         lookup: { type: GraphQLString },
-        nameContaine: { type: GraphQLString },
-        name: { type: GraphQLString },
-        edrpou: { type: GraphQLString },
+        //nameContaine: { type: GraphQLString },
+
         filter: {
           type: new GraphQLList(filtType),
         },
@@ -383,6 +396,7 @@ const BlogQueryRootType = new GraphQLObjectType({
         js: { type: GraphQLJSON },
       },
       resolve: async function (par, args, cont, info) {
+        console.log('===args:',args)
        
         var qq = createQueryCat(args, info, "partners", PartnerType, {
           lookup: args.lookup,
