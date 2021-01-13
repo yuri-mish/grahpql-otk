@@ -36,17 +36,16 @@ var token = parseCookies(req).token||'';
   console.log('token', token)
   req.currUser = Users.find((u)=>{return u.token===token})
   if (req.currUser)
-    res.setHeader('Set-Cookie',[`token=${req.currUser.token};  Path=/; Max-age= 3600;SameSite=false;`]);  
+       res.setHeader('Set-Cookie',[`token=${req.currUser.token};Path=/; Max-age= 3800`]);  
   next();
 }
 const app = express();
+app.disable('x-powered-by');
 app.use ( cors({
   'allowedHeaders': ['token', 'Content-Type'],
   'exposedHeaders': ['token'],
   'credentials': true,
-
-  'origin': ['http://localhost:3000','http://localhost:4000'],
-
+  'origin': 'http://localhost:3000' ,
 }) )
 
       
@@ -65,7 +64,7 @@ app.use('/', graphqlHTTP((req,res)=>{
   schema: schema,
   graphiql: true,
   //rootValue: { session: "req.session" },
-  
+   
   
    customFormatErrorFn: (err) => {
      const error = getErrorCode(err.message)

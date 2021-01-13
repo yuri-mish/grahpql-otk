@@ -4,9 +4,10 @@ const fetch = require("node-fetch");
 
 const { GraphQLJSON, GraphQLJSONObject } = require("graphql-type-json");
 //const GraphQLDecimal =require('graphql-type-decimal');
-const Users = require("./data/users");
 const Authors = require("./data/authors");
 const Posts = require("./data/posts");
+
+const Users = require("./data/users");
 
 let {
   GraphQLString,
@@ -228,6 +229,8 @@ const BuyersOrderType = new GraphQLObjectType({
     responsible:{type:UserType},
     vat_included:{type: GraphQLString},
     note: { type: GraphQLString },
+    paid: { type: GraphQLFloat },
+    shipped: { type: GraphQLFloat },
 
     totalcount:{ type: GraphQLInt },
     services: {
@@ -542,6 +545,35 @@ const BlogQueryRootType = new GraphQLObjectType({
         }
       },
     },
+    opendatabot: {
+      name: "opendatabot",
+      type: GraphQLJSONObject,
+      args: {
+        kod: {
+          type: GraphQLString,
+        },
+      },
+      resolve: async function (par, args, cont, info) {
+        console.log(args);
+        respError = {error:'Неавторизований'}
+	if (!(cont.currUser && cont.currUser.token)) return (respError)
+        res = await fetch(
+          `https://opendatabot.com/api/v2/fullcompany/${args.kod}?apiKey=egkG5O2foC&edr=true`,
+        )
+          .then((response) => {
+            if (response.ok) {
+              return response.json()
+            } else {
+              return { ok: false };
+            }
+          }).then((data)=>{
+		
+		console.log(data)  
+		return data
+	    })
+	return res
+      },
+    },
     tst: {
       name: "fff",
       type: GraphQLString,
@@ -562,12 +594,13 @@ const BlogQueryRootType = new GraphQLObjectType({
       name: "logout",
       type: GraphQLJSON,
       resolve: async (obj, args, context) => {
-        // if (!context.currUser) return {}
-        if (context.currUser.token) {
-          Users = _.remove(Users, function (n) {
-            return n.token === context.currUser.token;
-          });
-        }
+    
+	if (context.currUser) 
+		for (var i = Users.length; i--;)
+		     {
+			  if (Users[i].token === context.currUser.token) {Users.splice(i, 1);}
+		     }
+
         return {};
       },
     },
@@ -671,7 +704,7 @@ const BlogQueryRootType = new GraphQLObjectType({
               token = user.token;
             }
             context.res.setHeader("Set-Cookie", [
-              `token=${token};  Path=/; Max-age= 3600;SameSite=false;`,
+              `token=${token}; Max-age=38600; Path=/`,//;  Path=/; Max-age= 3600;SameSite=Lax;`,
             ]);
             return data;
           })
@@ -712,7 +745,7 @@ const BlogMutationRootType = new GraphQLObjectType({
             }
         //+++
         //console.log('ResQ:',resQ )
-        var resDoc = _.merge(orig_doc,args.input)
+        var resDoc  = _.merge(orig_doc,args.input)
         //console.log ('resDoc:', JSON.stringify(resDoc))
         
         const couch = dbf.couch.use("otk_2_doc");
