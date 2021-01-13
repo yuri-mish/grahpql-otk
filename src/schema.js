@@ -776,6 +776,57 @@ const BlogMutationRootType = new GraphQLObjectType({
         return {_id:"ok"}
       },
     }, 
+    setPartner: {
+      type: PartnerType,
+      args: { 
+        input: { 
+          type: GraphQLJSONObject
+        } 
+      },
+
+      resolve: async (source, args,context) => {
+        //console.log("Source: ", source, "\n Args: ", args);
+        //console.log("currUser:", context.currUser);
+        if (!context.currUser) return new Error("AUTH_ERROR");
+        const table = 'cat'
+        const class_name = `${table}.partners`
+        var qq = `SELECT d.jsb jsb FROM ${table} d  where d.id=$1 and d.class_name=$2`
+        //console.log('Query:',qq)
+        const dbf = require("./db");
+        var resQ = await dbf.query(qq, [args.input._id,class_name]);
+        var orig_doc = resQ.rows.length>0?resQ.rows[0].jsb:{
+//              department:context.currUser.branch,
+//              organization:context.currUser.organizations,
+            }
+        //+++
+        //console.log('ResQ:',resQ )
+        var resDoc  = _.merge(orig_doc,args.input)
+        //console.log ('resDoc:', JSON.stringify(resDoc))
+        
+        const couch = dbf.couch.use(`otk_2_${table}`);
+        if (resQ.rows.length>0) {
+          dbf.query(`UPDATE ${table} SET jsb=$1 WHERE id=$2`, 
+          [JSON.stringify(resDoc),
+            resDoc._id
+          ]);
+        }
+        else 
+        {
+          dbf.query(`INSERT INTO ${table} (id,jsb,class_name,ref) VALUES($1,$2,$3,$4)`, 
+          [ args.input._id,
+            JSON.stringify(resDoc),
+            class_name,
+            args.input._id.split("|")[1]
+          ]);
+        } 
+         
+        await couch.insert(resDoc).then((body) => {
+          // console.log('=couch response',body)
+        }  )
+      
+        return {_id:"ok"}
+      },
+    }, 
   },
 });
 const BlogAppSchema = new GraphQLSchema({
