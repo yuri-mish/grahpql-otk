@@ -297,7 +297,7 @@ const docSync = async () => {
     const doc_ver = res.rows[0].doc_ver;
     console.log("doc sync from seq:" + doc_ver);
     couch.changesReader
-      .start({ since: doc_ver, includeDocs: true })
+      .start({ since: doc_ver, includeDocs: true, wait: true })
       .on("batch", async (b) => {
         b.map(async (rec) => {
           if (!rec.doc || !rec.doc._id || !rec.doc.class_name ) return;
@@ -311,7 +311,7 @@ const docSync = async () => {
             );
           }
   
-          await dbf.querySync(
+          dbf.querySync(
             "INSERT INTO doc" +
               " (id,class_name,ref,jsb,date,branch) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (id) do " +
               "UPDATE SET class_name = EXCLUDED.class_name,ref=EXCLUDED.ref,jsb=EXCLUDED.jsb,date=EXCLUDED.date,branch=EXCLUDED.branch",

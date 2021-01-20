@@ -1,5 +1,10 @@
 const express = require('express');
 const {graphqlHTTP} = require('express-graphql');
+const { createServer } = require('http');
+const { execute, subscribe } = require('graphql');
+const { SubscriptionServer } = require('subscriptions-transport-ws');
+const { PubSub } = require('graphql-subscriptions');
+
 
 //const { v4: uuidv4 } = require('uuid');
 const schema = require('./src/schema.js');
@@ -40,12 +45,15 @@ var token = parseCookies(req).token||'';
   next();
 }
 const app = express();
+const ws = createServer(app);
+const subscriptionsEndpoint = `ws://localhost:${port}/subscriptions`;
+
 app.disable('x-powered-by');
 app.use ( cors({
   'allowedHeaders': ['token', 'Content-Type'],
   'exposedHeaders': ['token'],
   'credentials': true,
-  'origin': 'http://localhost:3000' ,
+  'origin': ['http://localhost:3000','https://otk.vioo.com.ua'] ,
 }) )
 
       
@@ -53,7 +61,7 @@ app.use(loggingMiddleware);
       
 
 
- app.get('/set-cookie', (req, res) => {
+app.get('/set-cookie', (req, res) => {
          res.cookie('token', '12345ABCDE')
          res.send('Set Cookie')
        })      
@@ -77,5 +85,18 @@ app.use('/', graphqlHTTP((req,res)=>{
 docSync();
 catSync();
 
-app.listen(port);   
-console.log('GraphQL API server running at localhost:'+ port);
+//app.listen(port);   
+//console.log('GraphQL API server running at localhost:'+ port);
+ws.listen(port, () => {
+  console.log(`wsGraphQL Server is now running on http://localhost:${port}`);
+
+  // Set up the WebSocket for handling GraphQL subscriptions.
+  new SubscriptionServer({
+    execute,
+    subscribe,
+    schema
+  }, {
+    server: ws,
+    path: '/',
+  });
+});

@@ -9,6 +9,9 @@ const Posts = require("./data/posts");
 
 const Users = require("./data/users");
 
+const { PubSub } = require('graphql-subscriptions')
+const pubsub = new PubSub();
+
 let {
   GraphQLString,
   GraphQLList,
@@ -20,6 +23,7 @@ let {
   GraphQLInt,
   GraphQLScalarType,
   GraphQLInputObjectType,
+  GraphQLBoolean,
 } = require("graphql");
 
 const {
@@ -61,8 +65,8 @@ const PartnerType = new GraphQLObjectType({
 //      edrpou: { type: GraphQLString },
       id: { type: GraphQLString },
       parent:{ type: GraphQLString },
-      is_buyer:{type: GraphQLInt},
-      is_supplier:{type: GraphQLInt},
+      is_buyer:{type: GraphQLBoolean},
+      is_supplier:{type: GraphQLBoolean},
       legal_address:{ type: GraphQLString },
       partner_details:{ type: GraphQLString },
       individual_legal:{ type: GraphQLString },
@@ -408,12 +412,28 @@ const BlogQueryRootType = new GraphQLObjectType({
           totalCount: args.totalCount?args.totalCount:undefined,
         });
         const dbf = require("./db");
-        //console.log(qq);
+        // console.log('===');
         res = await dbf.query(qq, []);
-        //console.log(res);
+
         if (!args.totalCount){
             return res.rows.map((e) => {
-                return e.jsb;
+	    
+            var retValue = false	
+	    if (e.jsb.is_buyer) {
+		if (e.jsb.is_buyer === "") retValue = false
+		else retValue = e.jsb.is_buyer;    
+	    }
+	    e.jsb.is_buyer = retValue
+	   
+	    retValue=false
+	    if (e.jsb.is_supplier) {
+		if (e.jsb.is_supplier === "") retValue = false
+		else retValue = e.jsb.is_supplier;    
+	    }
+	    e.jsb.is_supplier = retValue
+
+            return e.jsb;
+	    
             });
           }    
           return res.rows
@@ -772,7 +792,7 @@ const BlogMutationRootType = new GraphQLObjectType({
         await couch.insert(resDoc).then((body) => {
           // console.log('=couch response',body)
         }  )
-      
+      pubsub.publish('NOTIFICATION_NEW_DOCUMENT', args.input);//+++++
         return {_id:"ok"}
       },
     }, 
@@ -803,7 +823,7 @@ const BlogMutationRootType = new GraphQLObjectType({
         var resDoc  = _.merge(orig_doc,args.input)
         //console.log ('resDoc:', JSON.stringify(resDoc))
         
-        const couch = dbf.couch.use(`otk_2_${table}`);
+        const couch = dbf.couch.use(`otk_2_ram`);
         if (resQ.rows.length>0) {
           dbf.query(`UPDATE ${table} SET jsb=$1 WHERE id=$2`, 
           [JSON.stringify(resDoc),
@@ -829,9 +849,29 @@ const BlogMutationRootType = new GraphQLObjectType({
     }, 
   },
 });
+
+const SubscriptionRootType = new GraphQLObjectType({
+  name: "Subscription",
+  fields: {
+    docChange: {
+      type: GraphQLJSONObject, //BuyersOrderType, //BuyersOrderType,
+      args: { 
+        input: { 
+          type: GraphQLJSONObject
+        } 
+      },
+      resolve: (source, args,context) => {
+	console.log(`subscribed...`)
+        return pubsub.asyncIterator('NOTIFICATION_NEW_DOCUMENT')
+	}
+    }}
+})
+
 const BlogAppSchema = new GraphQLSchema({
   query: BlogQueryRootType,
   mutation: BlogMutationRootType,
+  subscription:SubscriptionRootType,
+
 });
 
 module.exports = BlogAppSchema;

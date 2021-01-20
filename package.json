@@ -20,6 +20,7 @@
     "express-session": "^1.17.1",
     "graphql": "^15.4.0",
     "graphql-fields-list": "^2.2.1",
+    "graphql-subscriptions": "^1.1.0",
     "graphql-type-decimal": "^1.0.0",
     "graphql-type-json": "^0.3.2",
     "lodash": "^4.17.20",
@@ -29,7 +30,9 @@
     "passport": "^0.4.1",
     "pg": "^8.5.1",
     "session-file-store": "^1.5.0",
-    "uuid": "^8.3.2"
+    "subscriptions-transport-ws": "^0.9.18",
+    "uuid": "^8.3.2",
+    "ws": "^7.4.2"
   },
   "devDependencies": {
     "babel": "^6.23.0",
