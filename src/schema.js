@@ -403,16 +403,30 @@ const BlogQueryRootType = new GraphQLObjectType({
         js: { type: GraphQLJSON },
       },
       resolve: async function (par, args, cont, info) {
-        console.log('===args:',args)
-       
-        var qq = createQueryCat(args, info, "partners", PartnerType, {
+        
+	console.log('===args:',args)
+//	console.log('===context:',cont)
+	const queryOptions = {
           lookup: args.lookup,
           nameContaine: args.nameContaine,
           limit: args.limit?args.limit:undefined,
           totalCount: args.totalCount?args.totalCount:undefined,
-        });
+	  rlsLimit: `inner join (select distinct jsb->>'partner' as pref from doc where branch = '${cont.currUser.branch}' and class_name = 'doc.buyers_order') dc on dc.pref=d.ref`
+        }
+	if(args.jfilt){
+	var noRls = false 
+	    args.jfilt.forEach((f)=>{
+		if (f && f.fld ==='edrpou' && f.val.length > 3 ){
+		noRls=true}
+	    })
+	if (noRls){
+		delete queryOptions.rlsLimit
+	    }
+	}
+       
+        var qq = createQueryCat(args, info, "partners", PartnerType, queryOptions);
         const dbf = require("./db");
-        // console.log('===');
+         console.log('===',qq);
         res = await dbf.query(qq, []);
 
         if (!args.totalCount){
@@ -824,6 +838,7 @@ const BlogMutationRootType = new GraphQLObjectType({
         //console.log ('resDoc:', JSON.stringify(resDoc))
         
         const couch = dbf.couch.use(`otk_2_ram`);
+    console.log('=1=',args.input)
         if (resQ.rows.length>0) {
           dbf.query(`UPDATE ${table} SET jsb=$1 WHERE id=$2`, 
           [JSON.stringify(resDoc),

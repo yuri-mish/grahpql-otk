@@ -84,7 +84,7 @@ const createQuery = (args, info, class_name, type, queryOptions = {}) => {
       f.ext.keyF +
       " and a_" +
       f.field +
-      ".jsb->>'class_name'='" +
+      ".class_name='" +
       f.ext.class_name +
       "')";
   });
@@ -92,6 +92,12 @@ const createQuery = (args, info, class_name, type, queryOptions = {}) => {
 
   var jfilt = "";
   if (args.jfilt) jfilt = " and " + createFilt(args.jfilt);
+
+  var rlsLimit="";
+ if (queryOptions.rlsLimit)
+    {
+	rlsLimit = queryOptions.rlsLimit//`inner join (select distinct jsb->>'partner' as ref from doc where branch = '2271c167-e82e-11ea-811a-00155da29310' and class_name = 'doc.buyers_order') dc on dc.ref = d.ref`
+    }
 
   //console.log("_jfilt:", jfilt);
 
@@ -106,16 +112,20 @@ const createQuery = (args, info, class_name, type, queryOptions = {}) => {
   if (queryOptions.currUser && !queryOptions.currUser.isAdmin)
     branch = ` and  d.branch='${queryOptions.currUser.branch}' `; 
 
-  var qq = `SELECT d.jsb ${strSel} jsb, d.jsb->>'date' date FROM doc d ${strJoin} where  not d.jsb?'_deleted' and d.jsb->>'class_name'= 'doc.${class_name}' ${jfilt}${branch}`;
-  if (args.sort)
-    qq += ` ORDER BY d.jsb->>'${args.sort.selector}' ${
+  var qq = `SELECT d.jsb ${strSel} jsb, d.date date FROM doc d ${strJoin} ${rlsLimit}  where  not d.jsb?'_deleted' and d.class_name= 'doc.${class_name}' ${jfilt}${branch}`;
+  if (args.sort){
+    var selector = `d.jsb->>'${args.sort.selector}'`
+    if (args.sort.selector==='date') selector = `d.date`
+    if (args.sort.selector==='_id') selector = `d.id`
+    qq += ` ORDER BY ${selector} ${
       args.sort.desc === "false" ? "" : "desc"
     } `;
+  }
   else qq += ` ORDER BY d.date desc `;
 
   if (limit) qq += " LIMIT " + limit;
   if (args.offset) qq += " OFFSET " + args.offset;
-  var qqTotalCount = `SELECT count(ref) totalcount FROM doc d  WHERE not d.jsb?'_deleted' and d.jsb->>'class_name'= 'doc.${class_name}' ${jfilt}${branch}`;
+  var qqTotalCount = `SELECT count(ref) totalcount FROM doc d  WHERE not d.jsb?'_deleted' and d.class_name= 'doc.${class_name}' ${jfilt}${branch}`;
   if (queryOptions.totalCount) qq = qqTotalCount;
 
   console.log(qq);
@@ -161,7 +171,7 @@ const createQueryCat = (
       f.ext.keyF +
       " and a_" +
       f.field +
-      ".jsb->>'class_name'='" +
+      ".class_name='" +
       f.ext.class_name +
       "')";
   });
@@ -169,6 +179,12 @@ const createQueryCat = (
   // console.log(strJoin)
   var jfilt = "";
   if (args.jfilt) jfilt = " and " + createFilt(args.jfilt);
+
+  var rlsLimit="";
+     if (createQueryOptions.rlsLimit)
+      {
+	rlsLimit = createQueryOptions.rlsLimit//`inner join (select distinct jsb->>'partner' as ref from doc where branch = '2271c167-e82e-11ea-811a-00155da29310' and class_name = 'doc.buyers_order') dc on dc.ref = d.ref`
+      }
 
  // var filt = "";
   if (createQueryOptions.limit) limit = createQueryOptions.limit;
@@ -195,8 +211,8 @@ const createQueryCat = (
 
   //console.log("o:", createQueryOptions);
   if (createQueryOptions.lookup) {
-    qq =`SELECT d.jsb${strSel} jsb, 0 orderU,d.jsb->>'name' jname FROM cat d ${strJoin}` +
-       +` WHERE not d.jsb?'_deleted' and d.jsb->>'class_name'= 'cat.${class_name}' and d.ref = '` +
+    qq =`SELECT d.jsb${strSel} jsb, 0 orderU,d.jsb->>'name' jname FROM cat d ${strJoin} ${rlsLimit}` +
+       +` WHERE not d.jsb?'_deleted' and d.class_name= 'cat.${class_name}' and d.ref = '` +
       createQueryOptions.lookup.trim() +
       "' UNION ";
     //  filt = " and d.jsb->>'name' LiKE '%КОПАЙ%' "
@@ -204,9 +220,9 @@ const createQueryCat = (
   qq +=
     `SELECT s.jsb,s.orderU,s.jsb->>'name' jname from (SELECT d.jsb${strSel} jsb, 1 orderU FROM cat d ` +
     strJoin +
-    ` WHERE not d.jsb?'_deleted' and d.jsb->>'class_name'= 'cat.${class_name}' ${jfilt}`
+    ` ${rlsLimit} WHERE not d.jsb?'_deleted' and d.class_name= 'cat.${class_name}' ${jfilt}`
   var qqTotalCount =
-    `SELECT count(ref) totalcount FROM cat d  WHERE not d.jsb?'_deleted' and d.jsb->>'class_name'= 'cat.${class_name}' ${jfilt}`
+    `SELECT count(ref) totalcount FROM cat d ${rlsLimit}  WHERE not d.jsb?'_deleted' and d.class_name= 'cat.${class_name}' ${jfilt}`
   if (createQueryOptions.nameContaine)
     qq +=
       " and d.jsb->>'name' ILIKE '%" + createQueryOptions.nameContaine + "%' ";
@@ -262,7 +278,7 @@ const createQueryTabular = (
       f.ext.keyF +
       " and a_" +
       f.field +
-      ".jsb->>'class_name'='" +
+      ".class_name='" +
       f.ext.class_name +
       "')";
   });
@@ -274,7 +290,7 @@ const createQueryTabular = (
     strSel +
     " jsb FROM (select jsonb_array_elements(d.jsb->'" +
     tabular +
-    "') jsb from doc d where not d.jsb?'_deleted' and d.jsb->>'class_name'= 'doc." +
+    "') jsb from doc d where not d.jsb?'_deleted' and d.class_name= 'doc." +
     class_name +
     "' and d.id = '" +
     par._id +
