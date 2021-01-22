@@ -1,4 +1,5 @@
 const express = require('express');
+
 const {graphqlHTTP} = require('express-graphql');
 const { createServer } = require('http');
 const { execute, subscribe } = require('graphql');
@@ -64,7 +65,24 @@ app.use(loggingMiddleware);
 app.get('/set-cookie', (req, res) => {
          res.cookie('token', '12345ABCDE')
          res.send('Set Cookie')
-       })      
+       }) 
+     
+app.get('/printform/:iddoc/:pform', async (req, res) => {
+
+         console.log(req.params)
+
+	var http = require('http');
+	var externalReq = http.request({
+    	    hostname: "1cweb.otk.in.ua",
+	    path: `/otk-base/hs/OTK?doc=buyers_order&ref=${req.params.iddoc}&rep=${req.params.pform}`
+    }, function(externalRes) {
+//        res.setHeader("content-disposition", "attachment; filename=logo.png");
+        externalRes.pipe(res);
+    });
+    externalReq.end()
+
+//         res.redirect(`https://1cweb.otk.in.ua/otk-base/hs/OTK?doc=buyers_order&ref=${req.params.iddoc}&rep=${req.params.pform}`)
+       }) 
 
 app.use('/', graphqlHTTP((req,res)=>{
     //console.log(res)

@@ -777,6 +777,7 @@ const BlogMutationRootType = new GraphQLObjectType({
               department:context.currUser.branch,
               organization:context.currUser.organizations,
             }
+	if (orig_doc.services) delete orig_doc.services
         //+++
         //console.log('ResQ:',resQ )
         var resDoc  = _.merge(orig_doc,args.input)
