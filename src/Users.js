@@ -12,7 +12,7 @@ const users = [
       lastName: 'Trenneman',
       email: 'roy@trenneman.com',
       password: 'imroy'
-    }
+    } 
   ];
   
 

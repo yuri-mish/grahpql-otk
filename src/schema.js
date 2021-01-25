@@ -420,7 +420,7 @@ const BlogQueryRootType = new GraphQLObjectType({
 		noRls=true}
 	    })
 	if (noRls){
-		delete queryOptions.rlsLimit
+		delete queryOptions.rlsLimit 
 	    }
 	}
        
