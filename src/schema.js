@@ -1,4 +1,4 @@
-const _ = require("lodash");
+const _ = require("lodash"); 
 const moment = require("moment");
 const fetch = require("node-fetch");
 
@@ -9,8 +9,21 @@ const Posts = require("./data/posts");
 
 const Users = require("./data/users");
 
-const { PubSub } = require('graphql-subscriptions')
+const { PubSub,withFilter  } = require('graphql-subscriptions')
 const pubsub = new PubSub();
+const config = require('./config');
+
+//const {Client} = require('pg')
+
+
+const { docListener } = require('./db')
+
+    docListener.on('notification',msg=>{
+        console.log('docChange',JSON.parse(msg.payload))
+        pubsub.publish('NOTIFICATION_NEW_DOCUMENT',JSON.parse(msg.payload))
+    })
+
+
 
 let {
   GraphQLString,
@@ -807,7 +820,6 @@ const BlogMutationRootType = new GraphQLObjectType({
         await couch.insert(resDoc).then((body) => {
           // console.log('=couch response',body)
         }  )
-      pubsub.publish('NOTIFICATION_NEW_DOCUMENT', args.input);//+++++
         return {_id:"ok"}
       },
     }, 
@@ -870,16 +882,24 @@ const SubscriptionRootType = new GraphQLObjectType({
   name: "Subscription",
   fields: {
     docChange: {
-      type: GraphQLJSONObject, //BuyersOrderType, //BuyersOrderType,
+      type: GraphQLJSONObject, BuyersOrderType, //BuyersOrderType,
       args: { 
         input: { 
           type: GraphQLJSONObject
         } 
       },
-      resolve: (source, args,context) => {
-	console.log(`subscribed...`)
-        return pubsub.asyncIterator('NOTIFICATION_NEW_DOCUMENT')
-	}
+        resolve: (source, args,context) => {
+//	console.log('...resolve new doc...')
+        return source
+	},
+        subscribe:  withFilter(
+		    ()=>pubsub.asyncIterator('NOTIFICATION_NEW_DOCUMENT'),
+		    (payload,args) => {
+//	    console.log('=args',args)
+			const user =  Users.find(user=>(user.name===args.input.username))
+			const branch = user?user.branch:''
+			return payload.branch === branch
+	})
     }}
 })
 

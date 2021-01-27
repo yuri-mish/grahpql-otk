@@ -1,120 +1,94 @@
-const express = require('express');
+'use strict';
 
-const {graphqlHTTP} = require('express-graphql');
-const { createServer } = require('http');
+const http = require('http');
+
+const express = require('express');
+const { graphqlHTTP } = require('express-graphql');
 const { execute, subscribe } = require('graphql');
 const { SubscriptionServer } = require('subscriptions-transport-ws');
-const { PubSub } = require('graphql-subscriptions');
-
-
-//const { v4: uuidv4 } = require('uuid');
-const schema = require('./src/schema.js');
 const cors = require('cors');
 
-const { errorType } = require('./constants')
-
+const schema = require('./src/schema.js');
 const Users = require("./src/data/users");
+const { docSync, catSync } = require("./src/schFunk");
+const { parseCookies } = require('./src/utils');
 
-const {docSync,catSync} = require("./src/schFunk");
+const { getErrorCode } = require('./errors');
+const config = require('./src/config');
 
-const getErrorCode = errorName => {
-  return errorType[errorName] 
-}
-
-let port = 4000;
-const SESSION_SECRECT = 'bad secret';
-
-
-const loggingMiddleware = (req, res, next) => {
- 
-  function parseCookies (request) {
-    var list = {},
-        rc = request.headers.cookie;
-
-    rc && rc.split(';').forEach(function( cookie ) {
-        var parts = cookie.split('=');
-        list[parts.shift().trim()] = decodeURI(parts.join('='));
-    });
-
-    return list;
-}
-var token = parseCookies(req).token||'';
-  console.log('token', token)
-  req.currUser = Users.find((u)=>{return u.token===token})
-  if (req.currUser)
-       res.setHeader('Set-Cookie',[`token=${req.currUser.token};Path=/; Max-age= 3800`]);  
-  next();
-}
 const app = express();
-const ws = createServer(app);
-const subscriptionsEndpoint = `ws://localhost:${port}/subscriptions`;
 
 app.disable('x-powered-by');
-app.use ( cors({
-  'allowedHeaders': ['token', 'Content-Type'],
-  'exposedHeaders': ['token'],
-  'credentials': true,
-  'origin': ['http://localhost:3000','https://otk.vioo.com.ua'] ,
-}) )
 
-      
-app.use(loggingMiddleware);
-      
-
+app.use(cors(config.server.cors));
 
 app.get('/set-cookie', (req, res) => {
-         res.cookie('token', '12345ABCDE')
-         res.send('Set Cookie')
-       }) 
-     
+  res.cookie('token', '12345ABCDE')
+  res.send('Set Cookie')
+});
+
+app.use((req, res, next) => {
+  const token = parseCookies(req).token || '';
+  console.log('token', token)
+  
+  req.currUser = Users.find(user => (user.token === token))
+
+  if (req.currUser) {
+    res.setHeader('Set-Cookie', [`token=${token};Path=/;Max-age=3800`]);
+  }
+
+  next();
+});
+
 app.get('/printform/:iddoc/:pform', async (req, res) => {
-
-         console.log(req.params)
-
-	var http = require('http');
-	var externalReq = http.request({
-    	    hostname: "1cweb.otk.in.ua",
-	    path: `/otk-base/hs/OTK?doc=buyers_order&ref=${req.params.iddoc}&rep=${req.params.pform}`
+    var http = require('http');
+    var externalReq = http.request({
+	hostname: "1cweb.otk.in.ua",
+        path: `/otk-base/hs/OTK?doc=buyers_order&ref=${req.params.iddoc}&rep=${req.params.pform}`
     }, function(externalRes) {
-//        res.setHeader("content-disposition", "attachment; filename=logo.png");
         externalRes.pipe(res);
     });
     externalReq.end()
+ }) 
 
-//         res.redirect(`https://1cweb.otk.in.ua/otk-base/hs/OTK?doc=buyers_order&ref=${req.params.iddoc}&rep=${req.params.pform}`)
-       }) 
+//const subscriptionsEndpoint = `ws://localhost:${config.server.port}/ws`;
+app.use('/', graphqlHTTP(() => {
+  return {
+    schema: schema,
+    graphiql: true,
 
-app.use('/', graphqlHTTP((req,res)=>{
-    //console.log(res)
-    return  ({
-  schema: schema,
-  graphiql: true,
-  //rootValue: { session: "req.session" },
-   
-  
-   customFormatErrorFn: (err) => {
-     const error = getErrorCode(err.message)
-     console.log('=Err:',err,error,err.message)
-     if (!error) return ({ message: 'Якась помилка', statusCode: 303 })
-     return ({ message: error.message, statusCode: error.statusCode })
-   }
-})}));
+    customFormatErrorFn: err => {
+      const error = getErrorCode(err.message);
+      console.log('=Err:', err, error, err.message);
+      return error;
+    }
+  };
+}));
 
 docSync();
 catSync();
 
+const ws = http.createServer(app);
+
 //app.listen(port);   
 //console.log('GraphQL API server running at localhost:'+ port);
-ws.listen(port, () => {
-  console.log(`wsGraphQL Server is now running on http://localhost:${port}`);
+ws.listen(config.server.port, () => {
+  console.log(
+    `wsGraphQL Server is now running on http://localhost:${config.server.port}`
+  );
 
   // Set up the WebSocket for handling GraphQL subscriptions.
-  new SubscriptionServer({
-    execute,
-    subscribe,
-    schema
-  }, {
-    server: ws,
-    path: '/',
-  });
+  new SubscriptionServer(
+    { execute, 
+	subscribe, 
+	schema:schema,
+     onConnect: (msg, connection, connectionContext) => {
+	      console.log('wsConnect')
+	//    console.log('msg:',msg)	
+	//    console.log('connection:',connection)	
+	//    console.log('context',connectionContext)	
+	},
+    },
+    { server: ws, path: '/ws' }
+  );
 });
