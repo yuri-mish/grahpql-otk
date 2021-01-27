@@ -409,7 +409,7 @@ const BlogQueryRootType = new GraphQLObjectType({
           type: new GraphQLList(filtType),
         },
         jfilt: {
-          type: new GraphQLList(GraphQLJSON),
+          type: new GraphQLList(GraphQLJSON), 
         },
 
         totalCount: { type: GraphQLInt },
