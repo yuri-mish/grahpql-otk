@@ -489,12 +489,28 @@ const BlogQueryRootType = new GraphQLObjectType({
         jfilt: {
           type: new GraphQLList(GraphQLJSON),
         },
+        options: {
+          type: GraphQLJSON,
+        },
         js: { type: GraphQLJSON },
         totalCount: { type: GraphQLInt },
 
       },
       resolve: async function (par, args, cont, info) {
         console.log(args);
+
+        //фильтр по группе услуг
+        if (args&&args.options&&args.options.selectServices)
+          {
+              const addF= {fld:'parent', expr:'=', val: config.parentService}
+              if (!args.jfilt)
+              args.jfilt = [addF]
+              else {
+                args.jfilt.push = { c: 'and' }
+                args.jfilt.push = addF
+              }
+          }
+
         var qq = createQueryCat(args, info, "nom", NomType, {
           lookup: args.lookup,
           nameContaine: args.nameContaine,

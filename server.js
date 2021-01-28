@@ -82,12 +82,12 @@ ws.listen(config.server.port, () => {
     { execute, 
 	subscribe, 
 	schema:schema,
-     onConnect: (msg, connection, connectionContext) => {
-	      console.log('wsConnect')
+   //  onConnect: (msg, connection, connectionContext) => {
+	//      console.log('wsConnect')
 	//    console.log('msg:',msg)	
 	//    console.log('connection:',connection)	
 	//    console.log('context',connectionContext)	
-	},
+	//},
     },
     { server: ws, path: '/ws' }
   );
