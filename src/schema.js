@@ -429,13 +429,15 @@ const BlogQueryRootType = new GraphQLObjectType({
 	if(args.jfilt){
 	var noRls = false 
 	    args.jfilt.forEach((f)=>{
-		if (f && f.fld ==='edrpou' && f.val.length > 3 ){
+		if (f && (f.fld ==='edrpou' && f.val.length > 3)){
 		noRls=true}
-	    })
-	if (noRls){
+      })
+  }
+  if (args.ref) noRls = true
+  
+  if (noRls){
 		delete queryOptions.rlsLimit 
-	    }
-	}
+  }
        
         var qq = createQueryCat(args, info, "partners", PartnerType, queryOptions);
         const dbf = require("./db");
